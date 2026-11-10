@@ -350,7 +350,7 @@ def dm_start_html(user, style: int, with_video: bool) -> str:
         else:
             video = f'<figure><video src="tg://video?id=intro" tg-spoiler></video>{cap}</figure>'
     return (
-        f'<h1>Welcome To <a href="{BOT_URL}">Tidal</a>!!</h1>'
+        f'<h1>Welcome To <a href="{BOT_URL}">Ishani</a>!!</h1>'
         f"<blockquote>{video}"
         f"{emoji_row}"
         f"<cite>{html.escape(DM_TAUTHOR)}{e(EMOJI_SUBDICT)}</cite></blockquote>"
@@ -440,7 +440,7 @@ async def send_dm_start(client, chat_id: int, user):
 
     # classic fallback (photo + normal inline keyboard)
     caption = (
-        f'<b>Welcome To <a href="{BOT_URL}">Tidal</a>!!</b>\n'
+        f'<b>Welcome To <a href="{BOT_URL}">Ishani</a>!!</b>\n'
         "───────────────────•\n\n"
         f"<blockquote>ʜєʏ, {_mention_html(user)}</blockquote>\n"
         f"<blockquote>{DM_TEXT}\n— {html.escape(DM_TEXT_AUTHOR)}</blockquote>"
@@ -624,7 +624,7 @@ async def start_pm(client, message: Message, _):
         await add_served_user(message.from_user.id)
         await thinking.show(EMOJI_ANALYSING, "Starting....")
         await asyncio.sleep(0.9)
-        await thinking.show(EMOJI_ANALYSING, "Hey, Welcome to Tidal")
+        await thinking.show(EMOJI_ANALYSING, "Hey, Welcome to Ishani")
         await asyncio.sleep(0.9)
         await thinking.show(EMOJI_ANALYSING, "Listen to Free music in telegram VCs and in private")
         await asyncio.sleep(1.2)
