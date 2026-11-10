@@ -1,0 +1,323 @@
+[09-Nov-26 06:47:42 - INFO] - SHUKLAMUSIC.core.mongo - Connecting to your Mongo Database...
+[09-Nov-26 06:47:42 - INFO] - SHUKLAMUSIC.core.mongo - Connected to your Mongo Database.
+[09-Nov-26 06:47:42 - INFO] - SHUKLAMUSIC.core.dir - Directories Updated.
+[09-Nov-26 06:47:49 - INFO] - SHUKLAMUSIC.core.git - Fetching updates from upstream repository...
+[09-Nov-26 06:47:49 - INFO] - SHUKLAMUSIC.misc - 𝗗𝗔𝗧𝗔𝗕𝗔𝗦𝗘 𝗟𝗢𝗔𝗗 𝗕𝗔𝗕𝗬🍫........
+[09-Nov-26 06:47:49 - INFO] - SHUKLAMUSIC.core.bot - Starting Bot...
+[09-Nov-26 06:47:52 - INFO] - SHUKLAMUSIC.misc - 𝗦𝗨𝗗𝗢 𝗨𝗦𝗘𝗥 𝗗𝗢𝗡𝗘✨🎋.
+[09-Nov-26 06:48:00 - INFO] - SHUKLAMUSIC.core.bot - Music Bot Started as ˹ᴛιᴅᴧʟ ꭙ ϻᴜsιᴄ˼♪ [ ɴᴏ ᴀᴅs ]™ 
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Added job "start_nightmode" to job store "default"
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Scheduler started
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Added job "close_nightmode" to job store "default"
+[09-Nov-26 06:48:00 - INFO] - apscheduler.scheduler - Scheduler started
+[09-Nov-26 06:48:00 - INFO] - SHUKLAMUSIC.plugins.play.aplay - curl_cffi not installed - Cloudflare-protected APIs may 403
+[09-Nov-26 06:48:00 - INFO] - pikepdf._core - pikepdf C++ to Python logger bridge initialized
+[09-Nov-26 06:48:01 - WARNING] - tgm - tgm plugin loaded
+[09-Nov-26 06:48:01 - INFO] - SHUKLAMUSIC.plugins - 𝐀𝐥𝐥 𝐅𝐞𝐚𝐭𝐮𝐫𝐞𝐬 𝐋𝐨𝐚𝐝𝐞𝐝 𝐁𝐚𝐛𝐲🥳...
+[09-Nov-26 06:48:01 - INFO] - SHUKLAMUSIC.core.userbot - Starting Assistants...
+[09-Nov-26 06:48:02 - INFO] - SHUKLAMUSIC.core.userbot - Assistant Started as <a href=tg://user?id=8144181895>˹ᴛɪᴅᴀʟ ꭙ ᴀssɪsᴛᴀɴᴛ˼ ♪</a>
+[09-Nov-26 06:48:05 - INFO] - SHUKLAMUSIC.core.userbot - Assistant Two Started as <a href=tg://user?id=8474466832>˹ᴛɪᴅᴀʟ ꭙ ᴀssɪsᴛᴀɴᴛ˼ 𝟸 ♪</a>
+[09-Nov-26 06:48:05 - INFO] - SHUKLAMUSIC.core.call - Starting PyTgCalls Client...
+
+[09-Nov-26 06:48:14 - INFO] - SHUKLAMUSIC - ╔═════ஜ۩۞۩ஜ════╗
+  ☠︎︎𝗠𝗔𝗗𝗘 𝗕𝗬 𝗠𝗥 𝗦𝗛𝗜𝗩𝗔𝗡𝗦𝗛
+╚═════ஜ۩۞۩ஜ════╝
+[09-Nov-26 06:58:52 - WARNING] - play - Ritesh stream url error for -CqtVvTddZU: TimeoutError()
+[09-Nov-26 07:07:11 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/userid.py", line 51, in getid
+    await message.reply_text(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/sync.py", line 53, in async_to_sync_wrap
+    coroutine = function(*args, **kwargs)
+TypeError: Message.reply() got an unexpected keyword argument 'disable_web_page_preview'
+[09-Nov-26 07:07:28 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/userid.py", line 51, in getid
+    await message.reply_text(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/sync.py", line 53, in async_to_sync_wrap
+    coroutine = function(*args, **kwargs)
+TypeError: Message.reply() got an unexpected keyword argument 'disable_web_page_preview'
+[09-Nov-26 07:31:13 - WARNING] - play - Ritesh stream url error for vXMBHYGhq8o: TimeoutError()
+[09-Nov-26 07:35:32 - WARNING] - play - Ritesh stream url error for XL2IGMs9Fok: TimeoutError()
+[09-Nov-26 07:42:37 - WARNING] - play - Ritesh stream url error for yapaJV_46mg: TimeoutError()
+[09-Nov-26 07:42:53 - WARNING] - play - Ritesh stream url error for dUBFWAyuOVA: TimeoutError()
+[09-Nov-26 07:54:29 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 08:16:00 - WARNING] - play - Ritesh stream url error for sHvEk_gbG_g: TimeoutError()
+[09-Nov-26 08:20:08 - WARNING] - play - Ritesh stream url error for RA1yVbJAjgE: TimeoutError()
+[09-Nov-26 08:24:54 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:24:55 - WARNING] - tidal_room - tidal inline error: QueryIdInvalid('Telegram says: [400 QUERY_ID_INVALID] - The query ID is invalid. (caused by "messages.SetInlineBotResults")')
+[09-Nov-26 08:27:34 - WARNING] - music_search - rich options failed, using keyboard fallback: ButtonUrlInvalid('Telegram says: [400 BUTTON_URL_INVALID] - The button url is invalid. (caused by "messages.SendMessage")')
+[09-Nov-26 08:29:52 - ERROR] - music_search - send song failed
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/music_search.py", line 456, in music_pick
+    audio, thumb = await _fetch_audio(item, work_dir)
+  File "/app/SHUKLAMUSIC/plugins/tools/music_search.py", line 170, in _fetch_audio
+    raise RuntimeError("audio download failed")
+RuntimeError: audio download failed
+[09-Nov-26 08:34:25 - WARNING] - play - Ritesh search error: TimeoutError()
+[09-Nov-26 08:34:40 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in CallbackQueryHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/Yumi/fonts.py", line 104, in nxt
+    await style_buttons(c, m, cb=True)
+  File "/app/SHUKLAMUSIC/plugins/Yumi/fonts.py", line 9, in style_buttons
+    text = m.text.split(' ',1)[1]
+AttributeError: 'CallbackQuery' object has no attribute 'text'
+[09-Nov-26 08:39:17 - WARNING] - play - Ritesh stream url error for b1ESNXT5o7M: TimeoutError()
+[09-Nov-26 08:44:11 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 282, in finalize
+    await self.bot.send_rich_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_rich_message.py", line 163, in send_rich_message
+    r = await self.invoke(rpc)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 RICH_MESSAGE_EMOJI_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 648, in ai_handler
+    await stream.finalize(final_html)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 287, in finalize
+    await self.bot.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 656, in ai_handler
+    await message.reply_text(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/types/messages_and_media/message.py", line 4772, in reply
+    return await self._client.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+[09-Nov-26 08:44:59 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:45:37 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:52:28 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:52:29 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in CallbackQueryHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/play/tidal_room.py", line 500, in tidal_cb
+    await cq.answer((res.get("text") or "Done")[:180], show_alert=not res.get("ok"))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/types/bots_and_keyboards/callback_query.py", line 206, in answer
+    return await self._client.answer_callback_query(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/bots/answer_callback_query.py", line 75, in answer_callback_query
+    return await self.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 154, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.QueryIdInvalid: Telegram says: [400 QUERY_ID_INVALID] - The query ID is invalid. (caused by "messages.SetBotCallbackAnswer")
+[09-Nov-26 08:52:54 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:53:25 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 08:54:18 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 09:01:28 - INFO] - tidal_room - chosen inline result: id='tl|a|n|LUgpPmj6nR8' imid='BQAAABBgNdIBAAAAZFYFAA6WlRvBwaqJ'
+[09-Nov-26 09:18:27 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:18:47 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:18:47 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:18:48 - WARNING] - group - rich message failed, using classic fallback: TypeError("SendRichMessage.send_rich_message() got an unexpected keyword argument 'reply_to_message_id'")
+[09-Nov-26 09:18:48 - WARNING] - group - vc_invited failed: TypeError("Message.reply() got an unexpected keyword argument 'disable_web_page_preview'")
+[09-Nov-26 09:19:00 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:00 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:01 - WARNING] - group - rich message failed, using classic fallback: TypeError("SendRichMessage.send_rich_message() got an unexpected keyword argument 'reply_to_message_id'")
+[09-Nov-26 09:19:01 - WARNING] - group - vc_invited failed: TypeError("Message.reply() got an unexpected keyword argument 'disable_web_page_preview'")
+[09-Nov-26 09:19:04 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:04 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:04 - WARNING] - group - rich message failed, using classic fallback: TypeError("SendRichMessage.send_rich_message() got an unexpected keyword argument 'reply_to_message_id'")
+[09-Nov-26 09:19:04 - WARNING] - group - vc_invited failed: TypeError("Message.reply() got an unexpected keyword argument 'disable_web_page_preview'")
+[09-Nov-26 09:19:04 - WARNING] - group - rich message failed, using classic fallback: TypeError("SendRichMessage.send_rich_message() got an unexpected keyword argument 'reply_to_message_id'")
+[09-Nov-26 09:19:04 - WARNING] - group - vc_invited failed: TypeError("Message.reply() got an unexpected keyword argument 'disable_web_page_preview'")
+[09-Nov-26 09:19:09 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:09 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')
+[09-Nov-26 09:19:10 - WARNING] - group - rich message failed, using classic fallback: TypeError("SendRichMessage.send_rich_message() got an unexpected keyword argument 'reply_to_message_id'")
+[09-Nov-26 09:19:10 - WARNING] - group - vc_invited failed: TypeError("Message.reply() got an unexpected keyword argument 'disable_web_page_preview'")
+[09-Nov-26 10:23:23 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 10:23:32 - WARNING] - tidal_room - tidal api error: TimeoutError()
+[09-Nov-26 10:23:33 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in CallbackQueryHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/play/tidal_room.py", line 500, in tidal_cb
+    await cq.answer((res.get("text") or "Done")[:180], show_alert=not res.get("ok"))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/types/bots_and_keyboards/callback_query.py", line 206, in answer
+    return await self._client.answer_callback_query(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/bots/answer_callback_query.py", line 75, in answer_callback_query
+    return await self.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 154, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.QueryIdInvalid: Telegram says: [400 QUERY_ID_INVALID] - The query ID is invalid. (caused by "messages.SetBotCallbackAnswer")
+[09-Nov-26 10:27:04 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/chatlog.py", line 24, in join_watcher
+    link = await app.export_chat_invite_link(chat.id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/invite_links/export_chat_invite_link.py", line 59, in export_chat_invite_link
+    r = await self.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 154, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.ChatAdminRequired: Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")
+[09-Nov-26 10:46:53 - WARNING] - play - Ritesh stream url error for U5Ws9LCLdZo: TimeoutError()
+[09-Nov-26 10:52:42 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 282, in finalize
+    await self.bot.send_rich_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_rich_message.py", line 163, in send_rich_message
+    r = await self.invoke(rpc)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 RICH_MESSAGE_EMOJI_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 648, in ai_handler
+    await stream.finalize(final_html)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 287, in finalize
+    await self.bot.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 656, in ai_handler
+    await message.reply_text(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/types/messages_and_media/message.py", line 4772, in reply
+    return await self._client.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+[09-Nov-26 11:13:46 - ERROR] - pyrogram.dispatcher - Unexpected exception raised in MessageHandler:
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 282, in finalize
+    await self.bot.send_rich_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_rich_message.py", line 163, in send_rich_message
+    r = await self.invoke(rpc)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 RICH_MESSAGE_EMOJI_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 648, in ai_handler
+    await stream.finalize(final_html)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 287, in finalize
+    await self.bot.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/dispatcher.py", line 477, in handler_worker
+    await handler.callback(self.client, *args)
+  File "/app/SHUKLAMUSIC/plugins/tools/Gpt.py", line 656, in ai_handler
+    await message.reply_text(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/types/messages_and_media/message.py", line 4772, in reply
+    return await self._client.send_message(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/messages/send_message.py", line 344, in send_message
+    r = await self.invoke(rpc, business_connection_id=business_connection_id)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/methods/advanced/invoke.py", line 108, in invoke
+    r = await session.invoke(
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 608, in invoke
+    return await self.send(query, timeout=timeout)
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/session/session.py", line 573, in send
+    RPCError.raise_it(result, type(data))
+  File "/usr/local/lib/python3.10/site-packages/pyrogram/errors/rpc_error.py", line 145, in raise_it
+    raise error_type(
+pyrogram.errors.exceptions.bad_request_400.BadRequest: Telegram says: [400 Bad Request] - [400 ENTITY_TEXT_INVALID] (caused by "messages.SendMessage")
+[09-Nov-26 11:23:29 - WARNING] - group - couldn't build VC link for -1002849184522: ChatAdminRequired('Telegram says: [400 CHAT_ADMIN_REQUIRED] - You must be an admin in this chat to do this. (caused by "messages.ExportChatInvite")')

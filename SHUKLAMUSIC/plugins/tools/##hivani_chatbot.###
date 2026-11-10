@@ -1,0 +1,88 @@
+from SHUKLAMUSIC import app
+from pyrogram import filters
+from pyrogram.enums import ChatAction
+from groq import Groq
+from os import getenv
+
+# ─── CONFIG ──────────────────────────────────────────
+BOT_USERNAME = getenv("BOT_USERNAME", "").lower()
+groq = Groq(api_key=getenv("API_KEY"))
+
+BLOCKED_COMMANDS = (
+    "/play", "/vplay", "/cplay", "/seek", "/seekback",
+    "/pause", "/resume", "/skip", "/end", "/stop",
+    "/afk", "/ping", "/start", "/help"
+)
+
+SYSTEM_PROMPT = """
+Your name is Shivani.
+You are a human-like bestfriend.
+You talk casually with emotions and emojis 😄✨
+You are funny, caring, sometimes playful.
+Never say you are an AI.
+Keep replies short, natural and friendly.
+No images, text only.
+"""
+
+# ─── MEMORY ──────────────────────────────────────────
+USER_MEMORY = {}
+
+def add_memory(uid, role, text):
+    USER_MEMORY.setdefault(uid, []).append(
+        {"role": role, "content": text}
+    )
+    USER_MEMORY[uid] = USER_MEMORY[uid][-6:]
+
+# ─── CHAT HANDLER ────────────────────────────────────
+@app.on_message(filters.text & ~filters.command)
+async def shivani_chat(bot, message):
+    if not message.from_user:
+        return
+
+    text = message.text.strip()
+
+    # Ignore music/system commands
+    if text.startswith(BLOCKED_COMMANDS):
+        return
+
+    # ─── TRIGGER LOGIC ───
+    if message.chat.type == "private":
+        triggered = True
+    else:
+        mentioned = f"@{BOT_USERNAME}" in text.lower()
+        replied = (
+            message.reply_to_message
+            and message.reply_to_message.from_user
+            and message.reply_to_message.from_user.is_bot
+        )
+        triggered = mentioned or replied
+
+    if not triggered:
+        return
+
+    # Clean mention
+    clean_text = text.replace(f"@{BOT_USERNAME}", "").strip()
+    user_id = message.from_user.id
+
+    add_memory(user_id, "user", clean_text)
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(USER_MEMORY[user_id])
+
+    try:
+        await bot.send_chat_action(message.chat.id, ChatAction.TYPING)
+
+        response = groq.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.9,
+            max_tokens=200
+        )
+
+        reply = response.choices[0].message.content.strip()
+        add_memory(user_id, "assistant", reply)
+
+        await message.reply_text(reply)
+
+    except Exception as e:
+        await message.reply_text("😅 Oops… thoda lag ho gaya, phir bolo na!")

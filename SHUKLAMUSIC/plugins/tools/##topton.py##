@@ -1,0 +1,142 @@
+import aiohttp
+import os
+import asyncio
+import traceback
+from pyrogram.enums import ParseMode
+from pyrogram import filters
+from pyrogram.types import Message
+from SHUKLAMUSIC import app
+
+async def get_ton_balance(address_or_username: str, is_username: bool):
+    """Fetch TON balance for a single address or username."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            # --- DNS RESOLUTION ---
+            if is_username:
+                dns_target = f"{address_or_username}.t.me"
+                async with session.get(f"https://tonapi.io/v2/dns/{dns_target}") as resp_dns:
+                    dns_data = await resp_dns.json()
+
+                if "error" in dns_data:
+                    return None
+
+                try:
+                    if "item" in dns_data and "owner" in dns_data["item"]:
+                        api_target = dns_data["item"]["owner"]["address"]
+                    elif "wallet" in dns_data and "wallet" in dns_data["wallet"]:
+                        api_target = dns_data["wallet"]["address"]
+                    else:
+                        return None
+                except (KeyError, TypeError):
+                    return None
+            else:
+                api_target = address_or_username
+
+            # --- FETCH ACCOUNT INFO ---
+            async with session.get(f"https://tonapi.io/v2/accounts/{api_target}") as resp_acc:
+                acc_data = await resp_acc.json()
+
+            if "error" in acc_data:
+                return None
+
+            nano_balance = int(acc_data.get("balance", 0))
+            ton_balance = nano_balance / 1e9
+            return ton_balance
+
+    except Exception:
+        return None
+
+
+async def delete_after_delay(messages: list, delay: int = 300):
+    """Deletes messages after a specified delay in seconds."""
+    await asyncio.sleep(delay)
+    for msg in messages:
+        try:
+            await msg.delete()
+        except:
+            pass
+
+
+@app.on_message(filters.command("top20ton"))
+async def top20ton_command(client, message: Message):
+    chat_id = message.chat.id
+
+    # Check if it's a group
+    if message.chat.type == "private":
+        msg = await message.reply_text("❌ This command only works in groups.")
+        asyncio.create_task(delete_after_delay([msg, message]))
+        return
+
+    # Fetch members
+    msg = await message.reply_text("<emoji id=5778421276024509124>⭐</emoji> Scanning group members...")
+
+    try:
+        members = []
+        async for member in app.get_chat_members(chat_id):
+            # Skip bots and users without username
+            if member.user.is_bot or not member.user.username:
+                continue
+            members.append(member.user)
+
+        total_members = len(members)
+
+        if total_members == 0:
+            await msg.edit_text("❌ No eligible members found (need usernames, no bots).")
+            asyncio.create_task(delete_after_delay([msg, message]))
+            return
+
+        if total_members > 600:
+            await msg.edit_text("❌ This group has more than 600 members. Command disabled for large groups.")
+            asyncio.create_task(delete_after_delay([msg, message]))
+            return
+
+        await msg.edit_text(f"<emoji id=5778421276024509124>⭐</emoji> Checking balances for {total_members} members...")
+
+        # Fetch balances concurrently
+        tasks = []
+        for user in members:
+            task = get_ton_balance(user.username.lower(), is_username=True)
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Combine users with balances
+        holders = []
+        for user, balance in zip(members, results):
+            if isinstance(balance, Exception):
+                continue
+            if balance is not None and balance > 0:
+                holders.append((user, balance))
+
+        if not holders:
+            await msg.edit_text("❌ No TON holders found in this group.")
+            asyncio.create_task(delete_after_delay([msg, message]))
+            return
+
+        # Sort by balance descending
+        holders.sort(key=lambda x: x[1], reverse=True)
+
+        # Build top 10 list
+        lines = []
+        lines.append(f"<b><emoji id=5778421276024509124>⭐</emoji> Top TON Holders in {message.chat.title}</b>")
+        lines.append("")
+
+        for idx, (user, balance) in enumerate(holders[:10], start=1):
+            username = f"@{user.username}"
+            ton_str = f"{balance:,.2f}"
+            lines.append(f"<b>{idx}.</b> {username} — <b>{ton_str}</b> <emoji id=6030549140633555631>⭐</emoji>")
+
+        # Add footer
+        lines.append("")
+        lines.append(f"<blockquote><emoji id=6296218646284863141>⭐</emoji> ʙʏ : @hehe_stalker</blockquote>")
+
+        final_text = "\n".join(lines)
+
+        final_msg = await message.reply_text(final_text, parse_mode=ParseMode.HTML)
+        await msg.delete()
+        asyncio.create_task(delete_after_delay([message, final_msg]))
+
+    except Exception:
+        traceback.print_exc()
+        await msg.edit_text("❌ Critical Error\n DM @subdict")
+        asyncio.create_task(delete_after_delay([msg, message]))
