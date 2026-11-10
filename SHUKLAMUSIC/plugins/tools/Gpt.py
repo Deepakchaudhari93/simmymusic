@@ -12,7 +12,7 @@ from pyrogram import filters, types
 from pyrogram.errors import PremiumAccountRequired, BadRequest
 from os import getenv
 
-API_KEY = getenv("API_KEY")
+API_KEY = getenv("GROQ_API_KEY")
 
 # â”€â”€â”€ ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -40,7 +40,7 @@ CODE_SUBCOMMANDS  = {"code"}
 LONG_TRIGGERS     = {"brief", "discuss", "detailed", "explain", "long", "full", "elaborate"}
 
 GROQ_HEADERS = {
-    "Authorization": f"Bearer {_API_KEY}",
+    "Authorization": f"Bearer {GROQ_API_KEY}",
     "Content-Type": "application/json"
 }
 
@@ -291,7 +291,7 @@ class RichStreamSession:
 
 # â”€â”€â”€ NSFW CHECKER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async def check_nsfw(prompt: str) -> bool:
-    if not API_KEY:
+    if not GROQ_API_KEY:
         return False
     try:
         payload = {
