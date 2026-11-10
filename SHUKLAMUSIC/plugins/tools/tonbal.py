@@ -50,7 +50,7 @@ async def get_balance_logic(client, message: Message, target_input: str, is_user
         # --- PROTECTION CHECK ---
         is_protected = await protected_collection.find_one({"username": target_input.lower()})
         if is_protected:
-            return await message.reply_text("<emoji id=5429561518024836270>⭐</emoji>  This user has been protected by @subdict")
+            return await message.reply_text("<emoji id=5429561518024836270>⭐</emoji>  This user has been protected by @mee_aarush")
 
     msg = await message.reply_text(f"<emoji id=5778421276024509124>⭐</emoji> Fetching balance for {display_name}...")
 
@@ -150,14 +150,14 @@ async def get_balance_logic(client, message: Message, target_input: str, is_user
 
     except Exception:
         traceback.print_exc()
-        await msg.edit_text("❌ Critical Error\n DM @subdict")
+        await msg.edit_text("❌ Critical Error\n DM @mee_aarush")
         asyncio.create_task(delete_after_delay([msg, message]))
 
 
 @app.on_message(filters.command("balance"))
 async def bal_command(client, message: Message):
     if len(message.command) < 2:
-        return await message.reply_text("❌ Please provide NFT username or TON address.\nExample: `/balance @subdict`")
+        return await message.reply_text("❌ Please provide NFT username or TON address.\nExample: `/balance @mee_aarush`")
 
     raw_input = message.command[1].lower()
     target = raw_input.replace("https://", "").replace("http://", "").replace("t.me/", "").replace("@", "").strip("/")
