@@ -68,10 +68,9 @@ RITESH_API_BASE = "https://api.riteshyt.in"
 RITESH_API_KEY = "riteshfreedaa236a0f9e521b0dd0ff7df"
 RITESH_SEARCH_TTL = 3600  # local in-memory cache TTL (seconds)
 
-# Separate MongoDB client + collection for the song stream-url cache
-# Uses a dedicated URI so it doesn't collide with the main bot DB.
 _ritesh_mongo_client = None
 _ritesh_song_col = None
+
 
 def _get_ritesh_col():
     """Lazy-init the separate MongoDB collection for Ritesh song cache."""
@@ -89,6 +88,7 @@ def _get_ritesh_col():
         log.warning("Ritesh mongo init failed: %r", e)
         _ritesh_song_col = None
     return _ritesh_song_col
+
 
 _RITESH_SEARCH_CACHE = {}  # query_lower -> (ts, {vidid, title, duration, thumb})
 
@@ -133,21 +133,49 @@ async def _ritesh_stream_url(vidid: str, video: bool = False) -> str | None:
         async with _session().get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
                 return None
-            # The API returns the stream URL directly (or as a redirect)
-            # Check if it's JSON with a url field, or a plain redirect
             ct = r.headers.get("Content-Type", "")
             if "json" in ct:
                 data = await r.json(content_type=None)
                 return data.get("url") or data.get("stream") or str(r.url)
-            # It's the actual stream URL (after redirects)
             return str(r.url)
     except Exception as e:
         log.warning("Ritesh stream url error for %s: %r", vidid, e)
         return None
 
 
+# ─── URL HEALTH PROBE ─────────────────────────────────────────────────────────
+# "failed to fetch track details" is almost always a dead/expired stream url.
+# A quick HEAD (fallback GET, only first byte) catches it before ffmpeg stalls.
+async def _url_alive(url: str, timeout: float = 6.0) -> bool:
+    if not url or not str(url).startswith(("http://", "https://")):
+        return False
+    try:
+        async with _session().head(
+            url,
+            timeout=aiohttp.ClientTimeout(total=timeout, connect=3),
+            allow_redirects=True,
+        ) as r:
+            if r.status < 400:
+                return True
+            if r.status in (405, 403):  # HEAD not allowed — try GET stream
+                pass
+            else:
+                return False
+    except Exception:
+        pass
+    try:
+        async with _session().get(
+            url,
+            timeout=aiohttp.ClientTimeout(total=timeout, connect=3),
+            allow_redirects=True,
+            headers={"Range": "bytes=0-1"},
+        ) as r:
+            return r.status < 400
+    except Exception:
+        return False
+
+
 async def _db_get_song(exact_query: str):
-    """Exact-match lookup in Ritesh song cache DB. Returns doc or None."""
     col = _get_ritesh_col()
     if col is None:
         return None
@@ -159,7 +187,6 @@ async def _db_get_song(exact_query: str):
 
 
 async def _db_save_song(exact_query: str, title: str, duration: str, stream_url: str):
-    """Save song to Ritesh cache DB."""
     col = _get_ritesh_col()
     if col is None:
         return
@@ -173,28 +200,29 @@ async def _db_save_song(exact_query: str, title: str, duration: str, stream_url:
         log.warning("Ritesh DB save error: %r", e)
 
 
-async def resolve_ritesh_fast(query: str, video: bool = False):
+async def resolve_ritesh_fast(query: str, video: bool = False, probe: bool = True):
     """
     PRIMARY fast path for both audio (/play) and video (/vplay):
-    1. Exact-match DB lookup (instant if previously played).
-    2. Otherwise: search API for vidid, then get stream url — both fast HTTP calls.
+    1. Exact-match DB lookup (instant if previously played) — probe the URL.
+    2. Otherwise: search API for vidid, then get stream url — probe the URL.
     3. Save to DB for next time.
-    DB key includes type so "tum se" audio and "tum se" video are stored separately.
-    Returns details dict for stream(streamtype="ritesh") or None.
+    If the URL is dead, return None so the caller falls back to DRX / YouTube.
     """
     exact_key = f"{'v' if video else 'a'}:{query.strip().lower()}"
 
-    # 1) DB cache hit — instant
+    # 1) DB cache hit — validate URL still alive
     cached = await _db_get_song(exact_key)
     if cached and cached.get("stream_url"):
-        return {
-            "title": cached["title"],
-            "duration_min": cached["duration"],
-            "thumb": DEFAULT_THUMB,
-            "vidid": exact_key,
-            "filepath": cached["stream_url"],
-            "link": "",
-        }
+        ok = await _url_alive(cached["stream_url"]) if probe else True
+        if ok:
+            return {
+                "title": cached["title"],
+                "duration_min": cached["duration"],
+                "thumb": DEFAULT_THUMB,
+                "vidid": exact_key,
+                "filepath": cached["stream_url"],
+                "link": "",
+            }
 
     # 2) Search to get vidid, then fetch stream url
     meta = await _ritesh_search(query)
@@ -203,6 +231,11 @@ async def resolve_ritesh_fast(query: str, video: bool = False):
 
     stream_url = await _ritesh_stream_url(meta["vidid"], video=video)
     if not stream_url:
+        return None
+
+    # probe before committing (skip if caller explicitly disabled)
+    if probe and not await _url_alive(stream_url):
+        log.warning("Ritesh stream url dead for %r: %s", query, stream_url[:80])
         return None
 
     # 3) Save for next time (fire and forget)
@@ -223,10 +256,7 @@ _DRX_CACHE = {}
 
 
 # ─── MUSIC API HELPERS (itzstalker.xyz) ───────────────────────────────────────
-# Only title, duration (already "M:SS") and the stream url are used from the API.
-# /play -> result=audio, /vplay -> result=video (one search call each).
-
-_API_CACHE = {}   # (lowercase query, "audio"|"video") -> (monotonic ts, [songs])
+_API_CACHE = {}
 _http = None
 
 
@@ -246,7 +276,7 @@ def _parse_song(item, mode):
         return None
     vid = item.get("id")
     st = item.get("stream")
-    if isinstance(st, dict):  # safety: if the API ever returns both
+    if isinstance(st, dict):
         audio, video = st.get("audio"), st.get("video")
     elif mode == "video":
         audio, video = None, st
@@ -300,7 +330,7 @@ async def drx_search_songs(query: str, video=False):
             _DRX_CACHE.clear()
         for sg in songs:
             old = _DRX_CACHE.get(sg["id"])
-            if old:  # keep the other stream type if we already have it
+            if old:
                 sg["audio"] = sg["audio"] or old.get("audio")
                 sg["video"] = sg["video"] or old.get("video")
             _DRX_CACHE[sg["id"]] = sg
@@ -309,29 +339,24 @@ async def drx_search_songs(query: str, video=False):
 
 
 def pick_stream(song, video):
-    """Video stream url for /vplay, audio stream url for /play."""
     if not song:
         return None
     return song.get("video") if video else song.get("audio")
 
 
-# ─── yt-dlp METADATA (title + duration) ───────────────────────────────────────
-# The API is only used for the stream url. Title / duration / id come from yt-dlp
-# (flat search, nothing is downloaded) and run in parallel with the API call.
-
+# ─── yt-dlp METADATA ──────────────────────────────────────────────────────────
 try:
     import yt_dlp
 except Exception:  # pragma: no cover
     yt_dlp = None
 
 YTDLP_TIMEOUT = 12
-_META_CACHE = {}     # video id -> {"id", "title", "duration"}
-_META_Q_CACHE = {}   # lowercase query -> (monotonic ts, meta)
+_META_CACHE = {}
+_META_Q_CACHE = {}
 _BG_TASKS = set()
 
 
 def _sec_to_min(sec):
-    """125 -> '2:05', 3725 -> '1:02:05', unknown / live -> None"""
     try:
         sec = int(float(sec))
     except Exception:
@@ -363,7 +388,6 @@ def _ytdlp_search_sync(query):
 
 
 async def ytdlp_search_meta(query: str):
-    """Fast yt-dlp lookup -> {"id", "title", "duration"} or None."""
     q = (query or "").strip()
     if not q or yt_dlp is None:
         return None
@@ -384,7 +408,7 @@ async def ytdlp_search_meta(query: str):
     meta = {
         "id": str(entry["id"]),
         "title": str(entry["title"]),
-        "duration": _sec_to_min(entry.get("duration")),  # None for live / unknown
+        "duration": _sec_to_min(entry.get("duration")),
     }
     if len(_META_Q_CACHE) > 500:
         _META_Q_CACHE.clear()
@@ -396,7 +420,6 @@ async def ytdlp_search_meta(query: str):
 
 
 async def _safe(coro):
-    """Await a coroutine, never raise (returns None on error)."""
     try:
         return await coro
     except Exception as e:
@@ -412,7 +435,6 @@ def _spawn(coro):
 
 
 def build_drx_details(song, meta, stream_url):
-    """title/duration from yt-dlp when we have it, API values otherwise."""
     meta = meta or {}
     return {
         "title": meta.get("title") or song["title"],
@@ -424,8 +446,6 @@ def build_drx_details(song, meta, stream_url):
 
 
 async def resolve_drx_fast(query: str, video):
-    """yt-dlp (title, duration) and the API (stream url) run at the same time.
-    Returns the `details` dict for stream(streamtype="drx") or None."""
     meta, songs = await asyncio.gather(
         _safe(ytdlp_search_meta(query)),
         _safe(drx_search_songs(query, bool(video))),
@@ -435,12 +455,12 @@ async def resolve_drx_fast(query: str, video):
     song = None
     if meta:
         song = next((s for s in songs if s["id"] == meta["id"]), None)
-        if song is None:  # API ranked a different song first: ask it for yt-dlp's pick
+        if song is None:
             more = await _safe(drx_search_songs(meta["id"], bool(video)))
             if more:
                 song = next((s for s in more if s["id"] == meta["id"]), None)
         if song is None:
-            meta = None  # never mix yt-dlp's title with another song's audio
+            meta = None
     if song is None:
         song = songs[0]
     stream_url = pick_stream(song, video)
@@ -449,16 +469,45 @@ async def resolve_drx_fast(query: str, video):
     return build_drx_details(song, meta, stream_url)
 
 
-# ─── ADDSONG DB HELPERS ───────────────────────────────────────────────────────
+# ─── SECURITY: input validation ───────────────────────────────────────────────
+_INJECTION_MARKERS = (
+    "${ifs}", "$ifs", "`", "$(", "\n", "\r",
+    ";", "|", "&", ">", "<", "&&", "||",
+    "curl ", "wget ", "nc ", "bash ", "sh -c", "tar ", "cp ", "mv ", "rm ",
+    "/proc/", "/etc/", "env.txt", "repo.tar", "reverse", "shell",
+)
 
+_URL_RE = re.compile(r"^https?://[^\s<>\"'`;|&$]+$", re.I)
+_QUERY_RE = re.compile(r"^[\w\s\-'.,!?&()\[\]+/À-ÿ]{1,200}$", re.UNICODE)
+
+FAILED_MSG = "❖ ғᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ǫᴜᴇʀʏ."
+
+
+def _looks_like_injection(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    if any(m in low for m in _INJECTION_MARKERS):
+        return True
+    if any(ord(c) < 32 and c != "\t" for c in text):
+        return True
+    return False
+
+
+def _is_safe_query(text: str) -> bool:
+    return bool(text) and bool(_QUERY_RE.match(text)) and not _looks_like_injection(text)
+
+
+def _is_safe_url(url: str) -> bool:
+    return bool(url) and bool(_URL_RE.match(url)) and not _looks_like_injection(url)
+
+
+# ─── ADDSONG DB HELPERS ───────────────────────────────────────────────────────
 async def get_added_song(query: str):
-    """Get an admin-added song by query (case-insensitive)."""
-    data = await addsongdb.find_one({"query": query.lower().strip()})
-    return data
+    return await addsongdb.find_one({"query": query.lower().strip()})
 
 
 async def save_added_song(query: str, url: str, title: str = None, duration: str = "00:00"):
-    """Save an admin-added song to DB."""
     await addsongdb.update_one(
         {"query": query.lower().strip()},
         {"$set": {"url": url, "title": title or query, "duration": duration}},
@@ -467,54 +516,41 @@ async def save_added_song(query: str, url: str, title: str = None, duration: str
 
 
 async def delete_added_song(query: str):
-    """Delete an admin-added song from DB."""
     await addsongdb.delete_one({"query": query.lower().strip()})
 
 
 async def list_added_songs():
-    """List all admin-added songs."""
     cursor = addsongdb.find({})
     return await cursor.to_list(length=1000)
 
 
-# ─── ADDSONG COMMAND ────────────────────────────────────────────────────────────
-
+# ─── ADDSONG COMMANDS ─────────────────────────────────────────────────────────
 @app.on_message(filters.command("addsong") & filters.user(ADMIN_ID))
 async def addsong_command(client, message: Message):
-    """
-    /addsong <query>
-    Admin adds a custom song URL for a query.
-    Bot will ask for the song URL in the next step.
-    """
     if len(message.command) < 2:
         return await message.reply_text(
-            "**Usage:**\n"
-            "`/addsong <query>`\n\n"
+            "**Usage:**\n`/addsong <query>`\n\n"
             "Example: `/addsong tum hi ho`\n\n"
             "Then reply with the song URL to save it."
         )
     query = message.text.split(None, 1)[1].strip()
-    
-    # Check if already exists
+    if not _is_safe_query(query):
+        return await message.reply_text(FAILED_MSG)
     existing = await get_added_song(query)
     if existing:
         return await message.reply_text(
             f"⚠️ A song already exists for **{query}**\n"
             f"URL: `{existing['url']}`\n\n"
-            "Reply with a new URL to update, or use `/delsong {query}` to remove first."
+            f"Reply with a new URL to update, or use `/delsong {query}` to remove first."
         )
-    
-    # Store pending state
     pending_key = f"addsong_pending:{message.from_user.id}"
     await mongodb.pending_states.update_one(
         {"key": pending_key},
         {"$set": {"key": pending_key, "query": query, "chat_id": message.chat.id}},
         upsert=True,
     )
-    
     await message.reply_text(
-        f"🎵 **Add Song Mode**\n"
-        f"Query: `{query}`\n\n"
+        f"🎵 **Add Song Mode**\nQuery: `{query}`\n\n"
         "Now reply to this message with the **song URL** you want to save.\n"
         "Or reply with `cancel` to abort."
     )
@@ -522,36 +558,28 @@ async def addsong_command(client, message: Message):
 
 @app.on_message(filters.reply & filters.user(ADMIN_ID))
 async def addsong_url_handler(client, message: Message):
-    """Handle URL reply for /addsong command."""
     if not message.reply_to_message:
         return
-    
     pending_key = f"addsong_pending:{message.from_user.id}"
     pending = await mongodb.pending_states.find_one({"key": pending_key})
     if not pending:
         return
-    
-    # Clean up pending state
     await mongodb.pending_states.delete_one({"key": pending_key})
-    
     if message.text.lower().strip() == "cancel":
         return await message.reply_text("❌ Add song cancelled.")
-    
     url = message.text.strip()
     query = pending["query"]
-    
+    if not _is_safe_url(url):
+        return await message.reply_text(FAILED_MSG)
     await save_added_song(query, url, title=query)
     await message.reply_text(
-        f"✅ **Song Added!**\n"
-        f"Query: `{query}`\n"
-        f"URL: `{url}`\n\n"
+        f"✅ **Song Added!**\nQuery: `{query}`\nURL: `{url}`\n\n"
         "Whenever someone searches for this query, this URL will be played directly."
     )
 
 
 @app.on_message(filters.command("delsong") & filters.user(ADMIN_ID))
 async def delsong_command(client, message: Message):
-    """Delete an admin-added song."""
     if len(message.command) < 2:
         return await message.reply_text("**Usage:** `/delsong <query>`")
     query = message.text.split(None, 1)[1].strip()
@@ -564,11 +592,9 @@ async def delsong_command(client, message: Message):
 
 @app.on_message(filters.command("listsongs") & filters.user(ADMIN_ID))
 async def listsongs_command(client, message: Message):
-    """List all admin-added songs."""
     songs = await list_added_songs()
     if not songs:
         return await message.reply_text("📭 No admin-added songs found.")
-    
     text = "📋 **Admin Added Songs:**\n\n"
     for i, song in enumerate(songs, 1):
         text += f"{i}. `{song['query']}` → `{song.get('url', 'N/A')[:50]}...`\n"
@@ -576,20 +602,12 @@ async def listsongs_command(client, message: Message):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#   RICH UI  —  rich messages + rich buttons (same engine as start.py)
-#   Everything for play / playforce / vplay / cplay / stream / sliders lives here.
+#   RICH UI
 # ═══════════════════════════════════════════════════════════════════════════════
-
 TUNES_URL = "https://t.me/nyxxai/room?startapp"
-
-# Media shown on EVERY now-playing card (the song's own api image is NOT used).
-# Direct http(s) link: jpg/png/webp image OR mp4/gif video.
 STREAM_MEDIA_URL = "https://files.catbox.moe/7nn61x.mp4"
-STREAM_MEDIA_SPOILER = True  # hide the media behind a spoiler until tapped
-
-EMOJI_ANALYSING = 5573473356579078196  # the "analysis" emoji from start.py
-
-# duration bar shown on the copy button (text before the duration)
+STREAM_MEDIA_SPOILER = True
+EMOJI_ANALYSING = 5573473356579078196
 DUR_BAR = "» •၊၊||၊|။||||။‌‌‌‌‌၊|။‌‌၊|၊|။||||။‌‌‌‌‌၊|။‌‌၊•"
 
 LBL_RESUME = "𝖱𝖾𝗌𝗎𝗆𝖾"
@@ -602,10 +620,8 @@ EMO_PAUSE = 5807945302124012062
 EMO_STOP = 6102688455014228420
 EMO_CLOSE = 5841541824803509441
 
-RICH_EMOJI_STYLE = 1  # 1 = <tg-emoji emoji-id="..">, 0 = <emoji id=..>; auto-detected
+RICH_EMOJI_STYLE = 1
 
-
-# ─── low level helpers ────────────────────────────────────────────────────────
 
 def _remoji(emoji_id: int, style: int, fallback: str = "⭐") -> str:
     if style == 0:
@@ -618,7 +634,6 @@ def _mention_html(user_id: int, name: str) -> str:
 
 
 def _classic_to_rich(text: str, style: int) -> str:
-    """Make a classic Telegram-HTML caption (language strings) safe inside a rich message."""
     text = re.sub(
         r'<emoji id="?(\d+)"?>(.*?)</emoji>',
         lambda m: _remoji(int(m.group(1)), style, m.group(2) or "⭐"),
@@ -630,12 +645,11 @@ def _classic_to_rich(text: str, style: int) -> str:
         lambda m: "</tg-spoiler>" if m.group(0)[1] == "/" else "<tg-spoiler>",
         text,
     )
-    text = re.sub(r"</?blockquote[^>]*>", "", text)  # no quote inside the quote
+    text = re.sub(r"</?blockquote[^>]*>", "", text)
     return text.replace("\r", "").replace("\n", "<br>")
 
 
 def _fmt_duration(d) -> str:
-    """2:39 -> '2:39 ᴍιη'.  Live / unknown values are shown as they are."""
     d = str(d or "").strip()
     if re.fullmatch(r"\d{1,2}(:\d{2}){1,2}", d) and d not in ("0:00", "00:00"):
         return f"{d} ᴍιη"
@@ -650,7 +664,6 @@ def _title_html(title, link=None) -> str:
 
 
 def _media_figure(url: str, caption_html: str = "", spoiler: bool = False) -> str:
-    """Image OR video (decided by the link, exactly like START_MEDIA_URL in start.py)."""
     cap = f"<figcaption>{caption_html}</figcaption>" if caption_html else ""
     u = html.escape(url)
     sp = " tg-spoiler" if spoiler else ""
@@ -681,7 +694,6 @@ def _classic_caption(title, duration, mention: str = None) -> str:
 
 
 def _fit_cb(prefix: str, query: str, suffix: str) -> str:
-    """callback_data must be <= 64 BYTES; trim the query (max 20 chars) to fit."""
     q = (query or "")[:20]
     room = 64 - len((prefix + suffix).encode("utf-8"))
     while q and len(q.encode("utf-8")) > room:
@@ -689,13 +701,7 @@ def _fit_cb(prefix: str, query: str, suffix: str) -> str:
     return f"{prefix}{q}{suffix}"
 
 
-# ─── buttons ──────────────────────────────────────────────────────────────────
-# row item = (text, kind, value, style)
-#   kind  : "url" | "callback" | "copy"
-#   style : "primary" | "success" | "danger" | None
-
 def _btn_label(text, emoji=None) -> str:
-    """Rich button label: custom emoji (<tg-emoji>) and/or text. Emoji-only is allowed."""
     parts = []
     if emoji:
         parts.append(_remoji(int(emoji), RICH_EMOJI_STYLE, "⭐"))
@@ -705,7 +711,6 @@ def _btn_label(text, emoji=None) -> str:
 
 
 def rich_buttons(rows) -> str:
-    """Buttons live inside the rich HTML itself (<tg-button-row> + <tg-button>)."""
     out = ""
     for row in rows:
         out += "<tg-button-row>"
@@ -725,13 +730,12 @@ def rich_buttons(rows) -> str:
 
 
 def classic_keyboard(rows) -> InlineKeyboardMarkup:
-    """Normal inline keyboard, used only if a rich message is rejected."""
     kb = []
     for row in rows:
         line = []
         for item in row:
             text, kind, value, style = item[:4]
-            text = text or "\u2060"  # classic buttons need a label
+            text = text or "\u2060"
             if kind == "url":
                 kwargs = {"url": value}
             elif kind == "copy":
@@ -761,8 +765,6 @@ def classic_keyboard(rows) -> InlineKeyboardMarkup:
             kb.append(line)
     return InlineKeyboardMarkup(kb)
 
-
-# search / selection rows (these replace the old inline play(10) markups) ------
 
 def track_rows(_, videoid, user_id, channel, fplay):
     return [
@@ -806,44 +808,30 @@ def slider_rows(_, videoid, user_id, query, query_type, channel, fplay):
     ]
 
 
-# now-playing rows ---------------------------------------------------------------
-
 def stream_rows(chat_id, duration):
     dur = str(duration or "00:00")
     return [
-        # no style, copies the duration (e.g. 2:39)
         [(f"{DUR_BAR} {dur}", "copy", dur, None)],
-        # same callbacks as the old stream_markup
         [
             ("", "callback", f"ADMIN Resume|{chat_id}", "primary", EMO_RESUME),
             ("", "callback", f"ADMIN Pause|{chat_id}", "primary", EMO_PAUSE),
             ("", "callback", f"ADMIN Stop|{chat_id}", "primary", EMO_STOP),
         ],
         [(LBL_VC, "url", TUNES_URL, "success")],
-        # same callback as the old close button
         [(LBL_CLOSE, "callback", "close", "danger", EMO_CLOSE)],
     ]
 
 
-# ─── sending ──────────────────────────────────────────────────────────────────
-
 async def send_rich(client, chat_id: int, builders, reply_to: int = None):
-    """
-    builders = [(html_func(style) -> str, media_or_None), ...] tried in order.
-    For each builder: current emoji tag style first, then the other one.
-    Returns the sent Message, or None if every rich attempt failed.
-    """
     global RICH_EMOJI_STYLE
     if InputRichMessage is None or not hasattr(client, "send_rich_message"):
         return None
-
     variants = []
     if reply_to:
         if ReplyParameters is not None:
             variants.append(dict(reply_parameters=ReplyParameters(message_id=reply_to)))
         variants.append(dict(reply_to_message_id=reply_to))
-    variants.append({})  # last resort: no reply (e.g. the command message was deleted)
-
+    variants.append({})
     last_err = None
     for html_func, media in builders:
         for style in (RICH_EMOJI_STYLE, 1 - RICH_EMOJI_STYLE):
@@ -862,9 +850,7 @@ async def send_rich(client, chat_id: int, builders, reply_to: int = None):
                     return msg
                 except Exception as e:
                     last_err = e
-                    log.warning(
-                        "send_rich_message failed (style=%s extra=%s): %r", style, list(extra), e
-                    )
+                    log.warning("send_rich_message failed: %r", e)
                     continue
     log.warning("rich message failed, using classic fallback: %r", last_err)
     return None
@@ -874,8 +860,8 @@ def now_playing_html(style, media_url, title, link, duration, mention, chat_id) 
     cap = _title_html(title, link)
     fig = _media_figure(media_url, cap, STREAM_MEDIA_SPOILER) if media_url else cap
     return (
-        f"<blockquote>{fig}</blockquote>"          # image + caption (song title) in a quote
-        f"{_info_aside(style, duration, mention)}"  # pullquote: duration + requested by
+        f"<blockquote>{fig}</blockquote>"
+        f"{_info_aside(style, duration, mention)}"
         f"{rich_buttons(stream_rows(chat_id, duration))}"
     )
 
@@ -883,10 +869,6 @@ def now_playing_html(style, media_url, title, link, duration, mention, chat_id) 
 async def send_now_playing(
     _, original_chat_id, chat_id, link, title, duration, user_name, user_id, thumb=None
 ):
-    """
-    The rich 'now playing' card. stream.py calls this (it is injected at the bottom of
-    this section). Returns the sent Message, or None -> stream.py sends the classic one.
-    """
     media_url = STREAM_MEDIA_URL or getattr(config, "PLAYLIST_IMG_URL", None)
     mention = _mention_html(user_id, user_name)
     builders = [
@@ -904,9 +886,6 @@ async def _noop(*args, **kwargs):
 
 
 def _freeze_markup(msg):
-    """The live timer-bar updater keeps calling edit_reply_markup on db[chat]['mystic'],
-    which adds a classic keyboard under the rich buttons. Make those calls do nothing
-    on this message (rich buttons live inside the message itself)."""
     for name in ("edit_reply_markup", "edit_message_reply_markup", "edit_caption"):
         try:
             setattr(msg, name, _noop)
@@ -922,7 +901,6 @@ def card_html(style, img, caption, rows, duration=None, spoiler=True) -> str:
 
 
 async def send_card(client, chat_id, img, caption, rows, duration=None, spoiler=True, reply_to=None):
-    """Image + caption in a quote, optional duration pullquote, rich buttons."""
     builders = [
         (lambda s: card_html(s, img, caption, rows, duration, spoiler), None),
         (lambda s: card_html(s, None, caption, rows, duration, spoiler), None),
@@ -941,23 +919,19 @@ async def send_text_card(client, chat_id, text_classic, rows, reply_to=None):
     return await send_rich(client, chat_id, builders, reply_to=reply_to)
 
 
-# song card (search result / slider) -------------------------------------------
-
 async def reply_card(message, img, title, duration, rows, spoiler=True):
     sent = await send_card(
         app, message.chat.id, img, _title_html(title), rows, duration, spoiler, reply_to=message.id
     )
     if sent is not None:
         return sent
-    return await message.reply_photo(  # classic fallback
+    return await message.reply_photo(
         photo=img,
         has_spoiler=spoiler,
         caption=_classic_caption(title, duration),
         reply_markup=classic_keyboard(rows),
     )
 
-
-# playlist card (caption comes from the language file) ---------------------------
 
 async def reply_card_html(message, img, cap_classic, rows):
     sent = await send_card(
@@ -990,8 +964,6 @@ async def show_livestream_prompt(mystic, _, track_id, user_id, mode, channel, fp
 
 
 async def replace_with_card(CallbackQuery, img, title, duration, rows, spoiler=True):
-    """Slider ◁ ▷: a rich message can't be edited into another rich message with media,
-    so send the new card and delete the old one (same approach as start.py)."""
     msg = CallbackQuery.message
     sent = await send_card(app, msg.chat.id, img, _title_html(title), rows, duration, spoiler)
     if sent is not None:
@@ -1008,16 +980,96 @@ async def replace_with_card(CallbackQuery, img, title, duration, rows, spoiler=T
     )
 
 
-# hand the now-playing card to stream.py -----------------------------------------
 try:
     _stream_mod = importlib.import_module("SHUKLAMUSIC.utils.stream.stream")
     _stream_mod.send_now_playing = send_now_playing
-except Exception as _e:  # pragma: no cover
+except Exception as _e:
     log.warning("couldn't hook rich now-playing into stream.py: %r", _e)
 
 
-# ─── MAIN PLAY COMMAND ────────────────────────────────────────────────────────
+# ─── TRY-CHAIN STREAM HELPER ──────────────────────────────────────────────────
+# "failed to fetch track details" means the given stream URL could not be played.
+# Instead of giving up on the FIRST failure, try: Ritesh → DRX → YouTube.
+async def _try_stream_with_fallback(
+    _, mystic, user_id, query, video, chat_id, user_name, original_chat_id, fplay
+):
+    """
+    Try Ritesh, then DRX, then YouTube. Returns (success: bool, error: str|None).
+    On success, mystic is deleted and play_logs is sent.
+    """
+    attempts = []
 
+    # ── Attempt 1: Ritesh ────────────────────────────────────────────────
+    try:
+        details = await resolve_ritesh_fast(query, video=bool(video))
+        if details:
+            try:
+                await stream(
+                    _, mystic, user_id, details, chat_id, user_name,
+                    original_chat_id, video=video, streamtype="ritesh", forceplay=fplay,
+                )
+                await SHUKLA.finish_prejoin(chat_id)
+                await mystic.delete()
+                await play_logs(mystic if False else None, streamtype="Ritesh API") if False else None
+                return True, None
+            except Exception as e:
+                attempts.append(f"ritesh: {type(e).__name__}: {e}")
+                log.warning("Ritesh stream failed for %r: %r", query, e)
+    except Exception as e:
+        attempts.append(f"ritesh-resolve: {type(e).__name__}: {e}")
+
+    # ── Attempt 2: DRX ───────────────────────────────────────────────────
+    try:
+        details = await resolve_drx_fast(query, video)
+        if details:
+            try:
+                await stream(
+                    _, mystic, user_id, details, chat_id, user_name,
+                    original_chat_id, video=video, streamtype="drx", forceplay=fplay,
+                )
+                await SHUKLA.finish_prejoin(chat_id)
+                await mystic.delete()
+                return True, None
+            except Exception as e:
+                attempts.append(f"drx: {type(e).__name__}: {e}")
+                log.warning("DRX stream failed for %r: %r", query, e)
+    except Exception as e:
+        attempts.append(f"drx-resolve: {type(e).__name__}: {e}")
+
+    # ── Attempt 3: YouTube ───────────────────────────────────────────────
+    try:
+        details, track_id = await YouTube.track(query)
+    except Exception as e:
+        attempts.append(f"youtube-resolve: {type(e).__name__}: {e}")
+        log.warning("YouTube track failed for %r: %r", query, e)
+        await SHUKLA.cancel_prejoin(chat_id)
+        return False, _["play_3"]
+
+    if not details.get("duration_min"):
+        # livestream -> can't auto-play, show live prompt
+        await SHUKLA.cancel_prejoin(chat_id)
+        await show_livestream_prompt(
+            mystic, _, track_id if "track_id" in locals() else "",
+            user_id, "v" if video else "a",
+            "c" if False else "g", "f" if fplay else "d",
+        )
+        return True, None  # handled
+
+    try:
+        await stream(
+            _, mystic, user_id, details, chat_id, user_name,
+            original_chat_id, video=video, streamtype="youtube", forceplay=fplay,
+        )
+        await SHUKLA.finish_prejoin(chat_id)
+        await mystic.delete()
+        return True, None
+    except Exception as e:
+        attempts.append(f"youtube-stream: {type(e).__name__}: {e}")
+        await SHUKLA.cancel_prejoin(chat_id)
+        return False, _["general_2"].format(type(e).__name__)
+
+
+# ─── MAIN PLAY COMMAND ────────────────────────────────────────────────────────
 @app.on_message(
     filters.command(
         ["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce"],
@@ -1047,18 +1099,33 @@ async def play_commnd(
     spotify = None
     user_id = message.from_user.id
     user_name = message.from_user.first_name
+
+    # ─── SECURITY GATE ──────────────────────────────────────────────────────
+    _args = message.command[1:] if len(message.command) > 1 else []
+    _arg_str = " ".join(_args).strip()
+    if _arg_str:
+        if _arg_str.lower().startswith(("http://", "https://")):
+            if not _is_safe_url(_arg_str):
+                return await mystic.edit_text(FAILED_MSG)
+        else:
+            if not _is_safe_query(_arg_str):
+                return await mystic.edit_text(FAILED_MSG)
+    if message.reply_to_message and message.reply_to_message.text:
+        _rt = message.reply_to_message.text.strip()
+        if _rt.lower().startswith(("http://", "https://")) and not _is_safe_url(_rt):
+            return await mystic.edit_text(FAILED_MSG)
+
     audio_telegram = (
         (message.reply_to_message.audio or message.reply_to_message.voice)
         if message.reply_to_message
         else None
     )
-
     video_telegram = (
         (message.reply_to_message.video or message.reply_to_message.document)
         if message.reply_to_message
         else None
     )
-    
+
     # ─── TELEGRAM AUDIO REPLY ───────────────────────────────────────────────
     if audio_telegram:
         if audio_telegram.file_size > 104857600:
@@ -1079,18 +1146,10 @@ async def play_commnd(
                 "path": file_path,
                 "dur": dur,
             }
-
             try:
                 await stream(
-                    _,
-                    mystic,
-                    user_id,
-                    details,
-                    chat_id,
-                    user_name,
-                    message.chat.id,
-                    streamtype="telegram",
-                    forceplay=fplay,
+                    _, mystic, user_id, details, chat_id, user_name,
+                    message.chat.id, streamtype="telegram", forceplay=fplay,
                 )
             except Exception as e:
                 ex_type = type(e).__name__
@@ -1098,7 +1157,7 @@ async def play_commnd(
                 return await mystic.edit_text(err)
             return await mystic.delete()
         return
-    
+
     # ─── TELEGRAM VIDEO REPLY ───────────────────────────────────────────────
     elif video_telegram:
         if message.reply_to_message.document:
@@ -1127,16 +1186,8 @@ async def play_commnd(
             }
             try:
                 await stream(
-                    _,
-                    mystic,
-                    user_id,
-                    details,
-                    chat_id,
-                    user_name,
-                    message.chat.id,
-                    video=True,
-                    streamtype="telegram",
-                    forceplay=fplay,
+                    _, mystic, user_id, details, chat_id, user_name,
+                    message.chat.id, video=True, streamtype="telegram", forceplay=fplay,
                 )
             except Exception as e:
                 ex_type = type(e).__name__
@@ -1144,17 +1195,17 @@ async def play_commnd(
                 return await mystic.edit_text(err)
             return await mystic.delete()
         return
-    
+
     # ─── URL PROVIDED ─────────────────────────────────────────────────────────
     elif url:
-        # Check for YouTube URL
+        if not _is_safe_url(url):
+            return await mystic.edit_text(FAILED_MSG)
+
         if await YouTube.exists(url):
             if "playlist" in url:
                 try:
                     details = await YouTube.playlist(
-                        url,
-                        config.PLAYLIST_FETCH_LIMIT,
-                        message.from_user.id,
+                        url, config.PLAYLIST_FETCH_LIMIT, message.from_user.id,
                     )
                 except Exception as e:
                     print(e)
@@ -1173,10 +1224,7 @@ async def play_commnd(
                 details, track_id = await YouTube.track(f"https://www.youtube.com/watch?v={videoid}")
                 streamtype = "youtube"
                 img = details["thumb"]
-                cap = _["play_11"].format(
-                    details["title"],
-                    details["duration_min"],
-                )
+                cap = _["play_11"].format(details["title"], details["duration_min"])
             else:
                 try:
                     details, track_id = await YouTube.track(url)
@@ -1186,10 +1234,7 @@ async def play_commnd(
                 streamtype = "youtube"
                 img = details["thumb"]
                 has_spoiler = True
-                cap = _["play_11"].format(
-                    details["title"],
-                    details["duration_min"],
-                )
+                cap = _["play_11"].format(details["title"], details["duration_min"])
         elif await Spotify.valid(url):
             spotify = True
             if not config.SPOTIFY_CLIENT_ID and not config.SPOTIFY_CLIENT_SECRET:
@@ -1273,22 +1318,12 @@ async def play_commnd(
             duration_sec = details["duration_sec"]
             if duration_sec > config.DURATION_LIMIT:
                 return await mystic.edit_text(
-                    _["play_6"].format(
-                        config.DURATION_LIMIT_MIN,
-                        app.mention,
-                    )
+                    _["play_6"].format(config.DURATION_LIMIT_MIN, app.mention)
                 )
             try:
                 await stream(
-                    _,
-                    mystic,
-                    user_id,
-                    details,
-                    chat_id,
-                    user_name,
-                    message.chat.id,
-                    streamtype="soundcloud",
-                    forceplay=fplay,
+                    _, mystic, user_id, details, chat_id, user_name,
+                    message.chat.id, streamtype="soundcloud", forceplay=fplay,
                 )
             except Exception as e:
                 ex_type = type(e).__name__
@@ -1297,55 +1332,55 @@ async def play_commnd(
             return await mystic.delete()
         else:
             # Generic URL / M3U8 / Index link
+            if not _is_safe_url(url):
+                return await mystic.edit_text(FAILED_MSG)
             try:
                 await SHUKLA.stream_call(url)
             except NoActiveGroupCall:
                 await mystic.edit_text(_["black_9"])
                 return await app.send_message(
-                    chat_id=config.LOGGER_ID,
-                    text=_["play_17"],
+                    chat_id=config.LOGGER_ID, text=_["play_17"],
                 )
             except Exception as e:
                 return await mystic.edit_text(_["general_2"].format(type(e).__name__))
             await mystic.edit_text(_["str_2"])
             try:
                 await stream(
-                    _,
-                    mystic,
-                    message.from_user.id,
-                    url,
-                    chat_id,
-                    message.from_user.first_name,
-                    message.chat.id,
-                    video=video,
-                    streamtype="index",
-                    forceplay=fplay,
+                    _, mystic, message.from_user.id, url, chat_id,
+                    message.from_user.first_name, message.chat.id,
+                    video=video, streamtype="index", forceplay=fplay,
                 )
             except Exception as e:
                 ex_type = type(e).__name__
                 err = e if ex_type == "AssistantErr" else _["general_2"].format(ex_type)
                 return await mystic.edit_text(err)
             return await play_logs(message, streamtype="M3u8 or Index Link")
-    
-    # ─── QUERY SEARCH (DRX API) ─────────────────────────────────────────────
+
+    # ─── QUERY SEARCH ──────────────────────────────────────────────────────
     else:
         if len(message.command) < 2:
             buttons = botplaylist_markup(_)
             return await mystic.edit_text(
-                _["play_18"],
-                reply_markup=InlineKeyboardMarkup(buttons),
+                _["play_18"], reply_markup=InlineKeyboardMarkup(buttons),
             )
-        
+
         query = message.text.split(None, 1)[1]
         if "-v" in query:
             query = query.replace("-v", "")
-        
-        # ─── CHECK ADMIN-ADDED SONGS FIRST ──────────────────────────────────
+        query = query.strip()
+
+        if not _is_safe_query(query):
+            return await mystic.edit_text(FAILED_MSG)
+
+        # ─── ADMIN-ADDED SONG (highest priority) ────────────────────────
         added_song = await get_added_song(query)
         if added_song:
-            # Play the admin-added URL directly
+            if not _is_safe_url(added_song["url"]):
+                return await mystic.edit_text(FAILED_MSG)
             try:
-                await mystic.edit_text(f"🎵 **Playing admin-added song...**\n`{added_song['query']}`")
+                await mystic.edit_text(
+                    f"🎵 **Playing admin-added song...**\n`{added_song['query']}`"
+                )
                 details = {
                     "title": added_song.get("title", added_song["query"]),
                     "link": added_song["url"],
@@ -1353,16 +1388,8 @@ async def play_commnd(
                     "dur": 0,
                 }
                 await stream(
-                    _,
-                    mystic,
-                    user_id,
-                    details,
-                    chat_id,
-                    user_name,
-                    message.chat.id,
-                    video=video,
-                    streamtype="index",
-                    forceplay=fplay,
+                    _, mystic, user_id, details, chat_id, user_name,
+                    message.chat.id, video=video, streamtype="index", forceplay=fplay,
                 )
             except Exception as e:
                 ex_type = type(e).__name__
@@ -1370,116 +1397,134 @@ async def play_commnd(
                 return await mystic.edit_text(err)
             await mystic.delete()
             return await play_logs(message, streamtype="Admin Added Song")
-        
-        # ─── MUSIC API SEARCH (fast path) ───────────────────────────────────
+
+        # ─── SEARCH MODE (slider) vs DIRECT MODE ────────────────────────
         slider = True
         direct_mode = str(playmode) == "Direct"
         cb_chat = "c" if channel else "g"
         cb_force = "f" if fplay else "d"
 
         if direct_mode:
-            # 1) assistant joins the VC right now (background)
-            # 2) Ritesh API: DB cache hit = instant, else search+stream in parallel
-            # 3) if Ritesh fails, try DRX, then YouTube
+            # Assistant resolves in background; try-chain handles fallback.
             await SHUKLA.start_prejoin(chat_id)
 
-            # ── Ritesh fast path (audio + video) ──
-            details = await resolve_ritesh_fast(query, video=bool(video))
-            if details:
-                try:
-                    await stream(
-                        _,
-                        mystic,
-                        user_id,
-                        details,
-                        chat_id,
-                        user_name,
-                        message.chat.id,
-                        video=video,
-                        streamtype="ritesh",
-                        forceplay=fplay,
-                    )
-                except Exception as e:
-                    await SHUKLA.cancel_prejoin(chat_id)
-                    ex_type = type(e).__name__
-                    err = e if ex_type == "AssistantErr" else _["general_2"].format(ex_type)
-                    return await mystic.edit_text(err)
-                await SHUKLA.finish_prejoin(chat_id)
-                await mystic.delete()
-                return await play_logs(message, streamtype="Ritesh API")
+            # Inline try-chain: Ritesh → DRX → YouTube
+            attempts = []
 
-            # ── DRX fallback ──
-            details = await resolve_drx_fast(query, video)
-            if details:
-                try:
-                    await stream(
-                        _,
-                        mystic,
-                        user_id,
-                        details,
-                        chat_id,
-                        user_name,
-                        message.chat.id,
-                        video=video,
-                        streamtype="drx",
-                        forceplay=fplay,
-                    )
-                except Exception as e:
-                    await SHUKLA.cancel_prejoin(chat_id)
-                    ex_type = type(e).__name__
-                    err = e if ex_type == "AssistantErr" else _["general_2"].format(ex_type)
-                    return await mystic.edit_text(err)
-                await SHUKLA.finish_prejoin(chat_id)
-                await mystic.delete()
-                return await play_logs(message, streamtype="DRX API")
-            # API had nothing -> YouTube fallback below (assistant stays joined)
+            # ── Try Ritesh ──
+            try:
+                details = await resolve_ritesh_fast(query, video=bool(video))
+                if details:
+                    try:
+                        await stream(
+                            _, mystic, user_id, details, chat_id, user_name,
+                            message.chat.id, video=video, streamtype="ritesh", forceplay=fplay,
+                        )
+                        await SHUKLA.finish_prejoin(chat_id)
+                        await mystic.delete()
+                        return await play_logs(message, streamtype="Ritesh API")
+                    except Exception as e:
+                        attempts.append(f"ritesh-stream: {type(e).__name__}: {e}")
+                        log.warning("Ritesh stream failed for %r: %r", query, e)
+                        # assistant already joined; leave it for the next attempt
+                else:
+                    attempts.append("ritesh: no details")
+            except Exception as e:
+                attempts.append(f"ritesh-resolve: {type(e).__name__}: {e}")
+                log.warning("Ritesh resolve failed for %r: %r", query, e)
+
+            # ── Try DRX ──
+            try:
+                details = await resolve_drx_fast(query, video)
+                if details:
+                    try:
+                        await stream(
+                            _, mystic, user_id, details, chat_id, user_name,
+                            message.chat.id, video=video, streamtype="drx", forceplay=fplay,
+                        )
+                        await SHUKLA.finish_prejoin(chat_id)
+                        await mystic.delete()
+                        return await play_logs(message, streamtype="DRX API")
+                    except Exception as e:
+                        attempts.append(f"drx-stream: {type(e).__name__}: {e}")
+                        log.warning("DRX stream failed for %r: %r", query, e)
+                else:
+                    attempts.append("drx: no details")
+            except Exception as e:
+                attempts.append(f"drx-resolve: {type(e).__name__}: {e}")
+                log.warning("DRX resolve failed for %r: %r", query, e)
+
+            # ── Try YouTube ──
+            try:
+                yt_details, yt_track_id = await YouTube.track(query)
+            except Exception as e:
+                attempts.append(f"youtube-resolve: {type(e).__name__}: {e}")
+                log.warning("YouTube track failed for %r: %r", query, e)
+                await SHUKLA.cancel_prejoin(chat_id)
+                log.warning("All attempts failed for %r: %s", query, " | ".join(attempts))
+                return await mystic.edit_text(_["play_3"])
+
+            if not yt_details.get("duration_min"):
+                await SHUKLA.cancel_prejoin(chat_id)
+                return await show_livestream_prompt(
+                    mystic, _, yt_track_id, user_id,
+                    "v" if video else "a",
+                    "c" if channel else "g",
+                    "f" if fplay else "d",
+                )
+
+            try:
+                await stream(
+                    _, mystic, user_id, yt_details, chat_id, user_name,
+                    message.chat.id, video=video, streamtype="youtube", forceplay=fplay,
+                )
+            except Exception as e:
+                await SHUKLA.cancel_prejoin(chat_id)
+                log.warning("All stream attempts failed for %r: %s", query, " | ".join(attempts))
+                ex_type = type(e).__name__
+                err = e if ex_type == "AssistantErr" else _["general_2"].format(ex_type)
+                return await mystic.edit_text(err)
+            await SHUKLA.finish_prejoin(chat_id)
+            await mystic.delete()
+            return await play_logs(message, streamtype="Youtube")
         else:
-            # selection card: warm the API cache in the background so the Audio/Video
-            # button starts instantly, title/duration come from yt-dlp
+            # ─── SEARCH MODE ─────────────────────────────────────────────
             warm = _spawn(_safe(drx_search_songs(query, bool(video))))
             meta = await _safe(ytdlp_search_meta(query))
             if meta:
                 duration_min = meta["duration"]
-                if not duration_min:  # live / unknown -> try the API's value
+                if not duration_min:
                     api_songs = await warm
-                    api_song = next((s for s in (api_songs or []) if s["id"] == meta["id"]), None)
+                    api_song = next(
+                        (s for s in (api_songs or []) if s["id"] == meta["id"]), None
+                    )
                     duration_min = api_song["duration"] if api_song else "00:00"
                 buttons = slider_rows(_, meta["id"], user_id, query, 0, cb_chat, cb_force)
                 await mystic.delete()
                 await reply_card(
-                    message,
-                    DEFAULT_THUMB,
-                    meta["title"].title(),
-                    duration_min,
-                    buttons,
-                    spoiler=True,
+                    message, DEFAULT_THUMB, meta["title"].title(),
+                    duration_min, buttons, spoiler=True,
                 )
                 return await play_logs(message, streamtype="Searched on DRX")
-            # yt-dlp unavailable -> old behaviour: card straight from the API result
+            # yt-dlp failed -> card straight from API result
             drx_results = await warm
             song = drx_results[0] if drx_results else None
             if song and pick_stream(song, video):
                 buttons = slider_rows(_, song["id"], user_id, query, 0, cb_chat, cb_force)
                 await mystic.delete()
                 await reply_card(
-                    message,
-                    DEFAULT_THUMB,
-                    song["title"].title(),
-                    song["duration"],
-                    buttons,
-                    spoiler=True,
+                    message, DEFAULT_THUMB, song["title"].title(),
+                    song["duration"], buttons, spoiler=True,
                 )
                 return await play_logs(message, streamtype="Searched on DRX")
+            # both failed -> YouTube track selection
+            try:
+                details, track_id = await YouTube.track(query)
+            except:
+                return await mystic.edit_text(_["play_3"])
+            streamtype = "youtube"
 
-        # Fallback to YouTube if the API has nothing / no stream url
-        try:
-            details, track_id = await YouTube.track(query)
-        except:
-            await SHUKLA.cancel_prejoin(chat_id)
-            return await mystic.edit_text(_["play_3"])
-        streamtype = "youtube"
-
-    # ─── DIRECT PLAY MODE ────────────────────────────────────────────────────
+    # ─── DIRECT PLAY MODE (non-query branch) ────────────────────────────────
     if str(playmode) == "Direct":
         if not plist_type:
             if details.get("duration_min"):
@@ -1492,27 +1537,16 @@ async def play_commnd(
             else:
                 await SHUKLA.cancel_prejoin(chat_id)
                 return await show_livestream_prompt(
-                    mystic,
-                    _,
-                    track_id if 'track_id' in locals() else "",
-                    user_id,
-                    "v" if video else "a",
-                    "c" if channel else "g",
-                    "f" if fplay else "d",
+                    mystic, _,
+                    track_id if "track_id" in locals() else "",
+                    user_id, "v" if video else "a",
+                    "c" if channel else "g", "f" if fplay else "d",
                 )
         try:
             await stream(
-                _,
-                mystic,
-                user_id,
-                details,
-                chat_id,
-                user_name,
-                message.chat.id,
-                video=video,
-                streamtype=streamtype,
-                spotify=spotify,
-                forceplay=fplay,
+                _, mystic, user_id, details, chat_id, user_name,
+                message.chat.id, video=video, streamtype=streamtype,
+                spotify=spotify, forceplay=fplay,
             )
         except Exception as e:
             await SHUKLA.cancel_prejoin(chat_id)
@@ -1529,12 +1563,8 @@ async def play_commnd(
             )
             lyrical[ran_hash] = plist_id
             buttons = playlist_rows(
-                _,
-                ran_hash,
-                message.from_user.id,
-                plist_type,
-                "c" if channel else "g",
-                "f" if fplay else "d",
+                _, ran_hash, message.from_user.id, plist_type,
+                "c" if channel else "g", "f" if fplay else "d",
             )
             await mystic.delete()
             await reply_card_html(message, img, cap, buttons)
@@ -1542,13 +1572,9 @@ async def play_commnd(
         else:
             if slider:
                 buttons = slider_rows(
-                    _,
-                    track_id if 'track_id' in locals() else "",
-                    message.from_user.id,
-                    query,
-                    0,
-                    "c" if channel else "g",
-                    "f" if fplay else "d",
+                    _, track_id if "track_id" in locals() else "",
+                    message.from_user.id, query, 0,
+                    "c" if channel else "g", "f" if fplay else "d",
                 )
                 await mystic.delete()
                 await reply_card(
@@ -1556,32 +1582,27 @@ async def play_commnd(
                     details.get("thumb", details.get("image", config.PLAYLIST_IMG_URL)),
                     details.get("title", "Unknown").title(),
                     details.get("duration_min", "00:00"),
-                    buttons,
-                    spoiler=True,
+                    buttons, spoiler=True,
                 )
-                return await play_logs(message, streamtype=f"Searched on {'DRX' if streamtype == 'drx' else 'Youtube'}")
+                return await play_logs(
+                    message,
+                    streamtype=f"Searched on {'DRX' if streamtype == 'drx' else 'Youtube'}",
+                )
             else:
                 buttons = track_rows(
-                    _,
-                    track_id if 'track_id' in locals() else "",
+                    _, track_id if "track_id" in locals() else "",
                     message.from_user.id,
-                    "c" if channel else "g",
-                    "f" if fplay else "d",
+                    "c" if channel else "g", "f" if fplay else "d",
                 )
                 await mystic.delete()
                 await reply_card(
-                    message,
-                    img,
-                    details.get("title", "Unknown"),
-                    details.get("duration_min", "00:00"),
-                    buttons,
-                    spoiler=False,
+                    message, img, details.get("title", "Unknown"),
+                    details.get("duration_min", "00:00"), buttons, spoiler=False,
                 )
-                return await play_logs(message, streamtype=f"URL Searched Inline")
+                return await play_logs(message, streamtype="URL Searched Inline")
 
 
-# ─── CALLBACK: MusicStream (for slider/track selection) ───────────────────────
-
+# ─── CALLBACK: MusicStream ────────────────────────────────────────────────────
 @app.on_callback_query(filters.regex("MusicStream") & ~BANNED_USERS)
 @languageCB
 async def play_music(client, CallbackQuery, _):
@@ -1606,47 +1627,36 @@ async def play_music(client, CallbackQuery, _):
     mystic = await CallbackQuery.message.reply_text(
         _["play_2"].format(channel) if channel else _["play_1"]
     )
-    
+
     video = True if mode == "v" else None
     ffplay = True if fplay == "f" else None
 
-    # assistant joins the VC immediately while the stream url is being fetched
     await SHUKLA.start_prejoin(chat_id)
 
-    # Music API for the stream url (song cached from the card that was clicked,
-    # else search by id). Title/duration: yt-dlp values saved by /play if we have them.
+    # ── Try DRX first (cached song details), fall back to YouTube ──────
     song = _DRX_CACHE.get(vidid)
     stream_url = pick_stream(song, video)
     if not stream_url:
-        # not cached for this type (audio/video): ask the API with the right result type
         drx_results = await drx_search_songs(vidid, bool(video))
         if drx_results:
             song = next((x for x in drx_results if x["id"] == vidid), None)
             stream_url = pick_stream(song, video)
+
     if stream_url:
         details = build_drx_details(song, _META_CACHE.get(song["id"]), stream_url)
         try:
             await stream(
-                _,
-                mystic,
-                CallbackQuery.from_user.id,
-                details,
-                chat_id,
-                user_name,
-                CallbackQuery.message.chat.id,
-                video,
-                streamtype="drx",
-                forceplay=ffplay,
+                _, mystic, CallbackQuery.from_user.id, details, chat_id,
+                user_name, CallbackQuery.message.chat.id, video,
+                streamtype="drx", forceplay=ffplay,
             )
+            await SHUKLA.finish_prejoin(chat_id)
+            return await mystic.delete()
         except Exception as e:
-            await SHUKLA.cancel_prejoin(chat_id)
-            ex_type = type(e).__name__
-            err = e if ex_type == "AssistantErr" else _["general_2"].format(ex_type)
-            return await mystic.edit_text(err)
-        await SHUKLA.finish_prejoin(chat_id)
-        return await mystic.delete()
+            # DRX stream failed → fall back to YouTube instead of erroring out
+            log.warning("DRX callback stream failed for %s: %r", vidid, e)
 
-    # Fallback to YouTube
+    # Fallback: YouTube
     try:
         details, track_id = await YouTube.track(vidid, True)
     except:
@@ -1662,28 +1672,14 @@ async def play_music(client, CallbackQuery, _):
     else:
         await SHUKLA.cancel_prejoin(chat_id)
         return await show_livestream_prompt(
-            mystic,
-            _,
-            track_id,
-            CallbackQuery.from_user.id,
-            mode,
-            "c" if cplay == "c" else "g",
-            "f" if fplay == "f" else "d",
+            mystic, _, track_id, CallbackQuery.from_user.id, mode,
+            "c" if cplay == "c" else "g", "f" if fplay == "f" else "d",
         )
-    video = True if mode == "v" else None
-    ffplay = True if fplay == "f" else None
     try:
         await stream(
-            _,
-            mystic,
-            CallbackQuery.from_user.id,
-            details,
-            chat_id,
-            user_name,
-            CallbackQuery.message.chat.id,
-            video,
-            streamtype="youtube",
-            forceplay=ffplay,
+            _, mystic, CallbackQuery.from_user.id, details, chat_id,
+            user_name, CallbackQuery.message.chat.id, video,
+            streamtype="youtube", forceplay=ffplay,
         )
     except Exception as e:
         await SHUKLA.cancel_prejoin(chat_id)
@@ -1698,7 +1694,10 @@ async def play_music(client, CallbackQuery, _):
 async def SHUKLAmous_check(client, CallbackQuery):
     try:
         await CallbackQuery.answer(
-            "» ʀᴇᴠᴇʀᴛ ʙᴀᴄᴋ ᴛᴏ ᴜsᴇʀ ᴀᴄᴄᴏᴜɴᴛ :\n\nᴏᴘᴇɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ sᴇᴛᴛɪɴɢs.\n-> ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs\n-> ᴄʟɪᴄᴋ ᴏɴ ʏᴏᴜʀ ɴᴀᴍᴇ\n-> ᴜɴᴄʜᴇᴄᴋ ᴀɴᴏɴʏᴍᴏᴜs ᴀᴅᴍɪɴ ᴘᴇʀᴍɪssɪᴏɴs.",
+            "» ʀᴇᴠᴇʀᴛ ʙᴀᴄᴋ ᴛᴏ ᴜsᴇʀ ᴀᴄᴄᴏᴜɴᴛ :\n\n"
+            "ᴏᴘᴇɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ sᴇᴛᴛɪɴɢs.\n"
+            "-> ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs\n-> ᴄʟɪᴄᴋ ᴏɴ ʏᴏᴜʀ ɴᴀᴍᴇ\n"
+            "-> ᴜɴᴄʜᴇᴄᴋ ᴀɴᴏɴʏᴍᴏᴜs ᴀᴅᴍɪɴ ᴘᴇʀᴍɪssɪᴏɴs.",
             show_alert=True,
         )
     except:
@@ -1710,14 +1709,7 @@ async def SHUKLAmous_check(client, CallbackQuery):
 async def play_playlists_command(client, CallbackQuery, _):
     callback_data = CallbackQuery.data.strip()
     callback_request = callback_data.split(None, 1)[1]
-    (
-        videoid,
-        user_id,
-        ptype,
-        mode,
-        cplay,
-        fplay,
-    ) = callback_request.split("|")
+    (videoid, user_id, ptype, mode, cplay, fplay) = callback_request.split("|")
     if CallbackQuery.from_user.id != int(user_id):
         try:
             return await CallbackQuery.answer(_["playcb_1"], show_alert=True)
@@ -1744,10 +1736,7 @@ async def play_playlists_command(client, CallbackQuery, _):
         spotify = False
         try:
             result = await YouTube.playlist(
-                videoid,
-                config.PLAYLIST_FETCH_LIMIT,
-                CallbackQuery.from_user.id,
-                True,
+                videoid, config.PLAYLIST_FETCH_LIMIT, CallbackQuery.from_user.id, True,
             )
         except:
             return await mystic.edit_text(_["play_3"])
@@ -1773,17 +1762,9 @@ async def play_playlists_command(client, CallbackQuery, _):
             return await mystic.edit_text(_["play_3"])
     try:
         await stream(
-            _,
-            mystic,
-            user_id,
-            result,
-            chat_id,
-            user_name,
-            CallbackQuery.message.chat.id,
-            video,
-            streamtype="playlist",
-            spotify=spotify,
-            forceplay=ffplay,
+            _, mystic, user_id, result, chat_id, user_name,
+            CallbackQuery.message.chat.id, video,
+            streamtype="playlist", spotify=spotify, forceplay=ffplay,
         )
     except Exception as e:
         ex_type = type(e).__name__
@@ -1797,14 +1778,7 @@ async def play_playlists_command(client, CallbackQuery, _):
 async def slider_queries(client, CallbackQuery, _):
     callback_data = CallbackQuery.data.strip()
     callback_request = callback_data.split(None, 1)[1]
-    (
-        what,
-        rtype,
-        query,
-        user_id,
-        cplay,
-        fplay,
-    ) = callback_request.split("|")
+    (what, rtype, query, user_id, cplay, fplay) = callback_request.split("|")
     if CallbackQuery.from_user.id != int(user_id):
         try:
             return await CallbackQuery.answer(_["playcb_1"], show_alert=True)
@@ -1832,7 +1806,6 @@ async def slider_queries(client, CallbackQuery, _):
         thumbnail = DEFAULT_THUMB
         vid = song["id"]
     else:
-        # Fallback to YouTube slider
         title, duration_min, thumbnail, vid = await YouTube.slider(query, query_type)
         title = title.title()
 
