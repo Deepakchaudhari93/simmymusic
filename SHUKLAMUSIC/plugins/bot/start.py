@@ -78,7 +78,7 @@ YUMI_PICS = [
 # ================================
 #        START CONFIG (DM)
 # ================================
-BOT_URL = "https://t.me/TidalXMusicBot"
+BOT_URL = "https://t.me/Ishanimusice_bot"
 START_EFFECT_ID = 5046509860389126442
 
 # video file sits inside the SHUKLAMUSIC package folder
@@ -86,7 +86,7 @@ START_VIDEO = os.path.join(
     os.path.dirname(os.path.abspath(SHUKLAMUSIC.__file__)),
     "VID_20261022_114101_321.mp4",
 )
-START_VIDEO_CAPTION = "𝚃𝚒𝚍𝚊𝚕 𝙼𝚞𝚜𝚒𝚌 ⓒ𝟸𝟶𝟸𝟼"
+START_VIDEO_CAPTION = "𝙸𝚜𝚑𝚊𝚗𝚒 𝙼𝚞𝚜𝚒𝚌 ⓒ𝟸𝟶𝟸𝟼"
 
 # Optional: put a direct http(s) link here to use an IMAGE (jpg/png/webp) or a VIDEO (mp4)
 # from a URL instead of the local video file. No upload needed. "" = use the local video.
@@ -106,19 +106,19 @@ EMOJI_ANALYSING = 5573473356579078196
 EMOJI_SUBDICT = 6235366428648678928
 
 
-DM_TEXT = "E𝗇𝗃𝗈𝗒 𝖯𝗋𝖾𝗆𝗂𝗎𝗆 𝖺𝗇𝖽 𝗎𝗇𝗅𝗂𝗆𝗂𝗍𝖾𝖽 𝖫𝗂𝗌𝗍𝖾𝗇𝗂𝗇𝗀 𝖾𝗑𝗉𝖾𝗋𝗂𝖾𝗇𝖼𝖾 𝗐𝗂𝗍𝗁 𝖳𝗂𝖽𝖺𝗅 𝖬𝗎𝗌𝗂𝖼 𝖡𝗈𝗍"
+DM_TEXT = "E𝗇𝗃𝗈𝗒 𝖯𝗋𝖾𝗆𝗂𝗎𝗆 𝖺𝗇𝖽 𝗎𝗇𝗅𝗂𝗆𝗂𝗍𝖾𝖽 𝖫𝗂𝗌𝗍𝖾𝗇𝗂𝗇𝗀 𝖾𝗑𝗉𝖾𝗋𝗂𝖾𝗇𝖼𝖾 𝗐𝗂𝗍𝗁 Ishani 𝖬𝗎𝗌𝗂𝖼 𝖡𝗈𝗍"
 DM_TEXT_AUTHOR = "- 𝚂𝚝𝚊𝚕𝚔𝚎𝚛"
-DM_TAUTHOR = "-𝙵𝚛𝚘𝚖 @subdict"
+DM_TAUTHOR = "-𝙵𝚛𝚘𝚖 @Mee_Aarush"
 SONG_PROMPT_TEXT = "Send the Song name directly in this chat, I'll download it for you, or use /play {song name}"
 HELP_CALLBACK = "settings_back_helper"  # same callback your old private_panel help button used
 
 # (text, kind, value, style)   kind: "url" | "callback"   style: primary/success/danger/None
 BTN_ADD = ("𝖠𝖽𝖽 𝖬𝖾 𝗂𝗇 𝗒𝗈𝗎𝗋 𝖦𝗋𝗈𝗎𝗉", "url", f"{BOT_URL}?startgroup=true", "primary")
 BTN_VCLESS = ("𝖦𝗈 𝖵𝖢𝗅𝖾𝗌𝗌 (𝖱𝗈𝗈𝗆'𝗌)", "url", "https://t.me/nyxxai/room?startapp", "success")
-BTN_UPDATES = ("𝖴𝗉𝖽𝖺𝗍𝖾𝗌", "url", "http://t.me/hmstalker", "danger")
-BTN_SUPPORT = ("𝖲𝗎𝗉𝗉𝗈𝗋𝗍", "url", "http://t.me/subdict", "danger")
-BTN_REPORT = ("𝖱𝖾𝗉𝗈𝗋𝗍 𝖡𝗎𝗀", "url", "http://t.me/subdict", "danger")
-BTN_SUGGEST = ("𝖲𝗎𝗀𝗀𝖾𝗌𝗍", "url", "http://t.me/subdict", "danger")
+BTN_UPDATES = ("𝖴𝗉𝖽𝖺𝗍𝖾𝗌", "url", "https://t.me/+2TXf5vdnm1UxMWM1", "danger")
+BTN_SUPPORT = ("𝖲𝗎𝗉𝗉𝗈𝗋𝗍", "url", "http://t.me/Mee_Aarush", "danger")
+BTN_REPORT = ("𝖱𝖾𝗉𝗈𝗋𝗍 𝖡𝗎𝗀", "url", "http://t.me/Mee_Aarush", "danger")
+BTN_SUGGEST = ("𝖲𝗎𝗀𝗀𝖾𝗌𝗍", "url", "https://t.me/+2TXf5vdnm1UxMWM1", "danger")
 BTN_HELP = ("𝖧𝖾𝗅𝗉 & 𝖢𝗈𝗆𝗆𝖺𝗇𝖽𝗌", "callback", HELP_CALLBACK, None)
 
 DM_BUTTONS = [
