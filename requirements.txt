@@ -4,7 +4,7 @@ aiohttp
 apscheduler
 asyncio
 bard
-stripe==10.7.0
+stripe==16.1.0
 mysql-connector-python==9.0.0
 telebot
 bing_image_downloader
