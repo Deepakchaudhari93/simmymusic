@@ -12,7 +12,7 @@ from pyrogram import filters, types
 from pyrogram.errors import PremiumAccountRequired, BadRequest
 from os import getenv
 
-API_KEY = getenv("GROQ_API_KEY")
+GROQ_API_KEY = getenv("GROQ_API_KEY")
 
 # â”€â”€â”€ ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
