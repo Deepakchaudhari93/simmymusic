@@ -13,8 +13,10 @@
 # -----------------------------------------------
 import asyncio
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Union
+
 from pyrogram import Client
 from pyrogram.types import InlineKeyboardMarkup, LinkPreviewOptions
 from pytgcalls import PyTgCalls, filters
@@ -114,6 +116,18 @@ def make_stream(path, video=False, ffmpeg_params=None):
         video_flags=MediaStream.Flags.IGNORE,
         **kwargs,
     )
+
+
+# ─── SECURITY: speed value whitelist ──────────────────────────────────────────
+_ALLOWED_SPEEDS = {"0.5", "0.75", "1.0", "1.5", "2.0"}
+_SPEED_RE = re.compile(r"^\d+(\.\d+)?$")
+
+
+def _safe_speed(speed) -> str:
+    s = str(speed).strip()
+    if s not in _ALLOWED_SPEEDS:
+        raise AssistantErr("Umm")
+    return s
 
 
 class Call:
@@ -257,8 +271,19 @@ class Call:
             pass
 
     async def speedup_stream(self, chat_id: int, file_path, speed, playing):
+        """Speed up / slow down a stream.
+
+        SECURITY: the old code used asyncio.create_subprocess_shell with the raw
+        file_path concatenated into a shell string — any query / URL containing
+        ; | $() etc. executed on the server. We now:
+          1. whitelist `speed` to a fixed set,
+          2. pass file_path as a *separate argument* to create_subprocess_exec
+             (no shell, no word splitting, no command injection).
+        """
+        speed = _safe_speed(speed)  # raises AssistantErr on anything unexpected
         assistant = await group_assistant(self, chat_id)
-        if str(speed) != str("1.0"):
+
+        if str(speed) != "1.0":
             if str(file_path).startswith("http"):
                 import hashlib
                 base = hashlib.md5(str(file_path).encode()).hexdigest()[:16] + ".mka"
@@ -269,33 +294,27 @@ class Call:
                 os.makedirs(chatdir)
             out = os.path.join(chatdir, base)
             if not os.path.isfile(out):
-                if str(speed) == str("0.5"):
-                    vs = 2.0
-                if str(speed) == str("0.75"):
-                    vs = 1.35
-                if str(speed) == str("1.5"):
-                    vs = 0.68
-                if str(speed) == str("2.0"):
-                    vs = 0.5
-                proc = await asyncio.create_subprocess_shell(
-                    cmd=(
-                        "ffmpeg "
-                        "-i "
-                        f"{file_path} "
-                        "-filter:v "
-                        f"setpts={vs}*PTS "
-                        "-filter:a "
-                        f"atempo={speed} "
-                        f"{out}"
-                    ),
+                vs_map = {
+                    "0.5": 2.0,
+                    "0.75": 1.35,
+                    "1.5": 0.68,
+                    "2.0": 0.5,
+                }
+                vs = vs_map.get(speed, 1.0)
+                # ── SECURITY: create_subprocess_exec (list args, no shell) ──
+                proc = await asyncio.create_subprocess_exec(
+                    "ffmpeg",
+                    "-i", str(file_path),
+                    "-filter:v", f"setpts={vs}*PTS",
+                    "-filter:a", f"atempo={speed}",
+                    str(out),
                     stdin=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await proc.communicate()
-            else:
-                pass
         else:
             out = file_path
+
         dur = await asyncio.get_event_loop().run_in_executor(None, check_duration, out)
         dur = int(dur)
         played, con_seconds = speed_converter(playing[0]["played"], speed)
